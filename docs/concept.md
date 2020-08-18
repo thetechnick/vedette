@@ -10,7 +10,7 @@ Your app needs something, Vedette gives you something fitting your requirements 
 
 Let's say you want to deploy wordpress. Wordpress needs a MySQL or MariaDB database, or at least something that speaks mysql protocol on the wire.
 
-Now depending on your cloud provider, uptime requirements, whether it's just a staging deployment or if you want to test alternatives, you might find yourself in the situation that you want to swap your litte out-of-cluster MariaDB server (that was carefully setup by yourself) with an Operator on Kubernetes or with AWS RDS or Google Cloud SQL.
+Now depending on your cloud provider, uptime requirements, whether it's just a staging deployment or if you want to test alternatives, you might find yourself in the situation that you want to swap your little out-of-cluster MariaDB server (that was carefully setup by yourself) with an Operator on Kubernetes or with AWS RDS or Google Cloud SQL.
 
 This is the point where you start looking through the wordpress documentation and whatever you use to install it on Kubernetes (Helm Chart, Static Deployment, ...) to find out with knob to turn to make it use another DB backend.
 
@@ -134,6 +134,15 @@ spec:
           secretName: my-wordpress-db-app-user
 # --- inserted by Vedette (end)
 ```
+
+### CapabilityClaim matches multiple CapabilityClasses
+
+`CapabilityClaims` need to select only a single `CapabilityClass`.
+
+If multiple `CapabilityClass` object match the specified selector and the `CapabilityClaim` is not yet `Bound` it will remain `Unbound` and a warning will be logged onto the `Claim`.  
+The ambiguity needs to be resolved before the `CapabilityClaim` is bound to a backing instance.
+
+If the `CapabilityClaim` is already `Bound`, nothing will happen.
 
 ### CapabilityClass
 
