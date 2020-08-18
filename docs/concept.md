@@ -24,13 +24,13 @@ Just change your apps requirements to "I want something speaking mysql protocol,
 
 ## API
 
-### CapabilityClaim
+### InterfaceClaim
 
-`CapabilityClaims` define, what your application needs from a dependency and how it wants to consume the connection informations.
+`InterfaceClaims` define, what your application needs from a dependency and how it wants to consume the connection informations.
 
 ```yaml
 apiVersion: vedette.io/v1alpha1
-kind: CapabilityClaim
+kind: InterfaceClaim
 metadata:
   name: my-wordpress-db
 spec:
@@ -66,7 +66,7 @@ status:
 
 ### Consuming Capabilities from a Pod
 
-To make use of capabilities from your application, all you have to do is add a reference to the `CapabilityClaim` into your `Deployment` annotations:
+To make use of capabilities from your application, all you have to do is add a reference to the `InterfaceClaim` into your `Deployment` annotations:
 
 ```yaml
 apiVersion: apps/v1
@@ -94,7 +94,7 @@ spec:
 
 Vedette will automatically add needed mounts and env vars to consume the `Secrets`, `ConfigMaps`, etc that the Claim is providing and a controller will automatically update your deployment if the Claim itself is updated.
 
-For the `CapabilityClaim` above, it will look like this:
+For the `InterfaceClaim` above, it will look like this:
 
 ```yaml
 apiVersion: apps/v1
@@ -135,27 +135,27 @@ spec:
 # --- inserted by Vedette (end)
 ```
 
-### CapabilityClaim matches multiple CapabilityClasses
+### InterfaceClaim matches multiple InterfaceClasses
 
-`CapabilityClaims` need to select only a single `CapabilityClass`.
+`InterfaceClaims` need to select only a single `InterfaceClass`.
 
-If multiple `CapabilityClass` object match the specified selector and the `CapabilityClaim` is not yet `Bound` it will remain `Unbound` and a warning will be logged onto the `Claim`.  
-The ambiguity needs to be resolved before the `CapabilityClaim` is bound to a backing instance.
+If multiple `InterfaceClass` object match the specified selector and the `InterfaceClaim` is not yet `Bound` it will remain `Unbound` and a warning will be logged onto the `Claim`.  
+The ambiguity needs to be resolved before the `InterfaceClaim` is bound to a backing instance.
 
-If the `CapabilityClaim` is already `Bound`, nothing will happen.
+If the `InterfaceClaim` is already `Bound`, nothing will happen.
 
-### CapabilityClass
+### InterfaceClass
 
-A `CapabilityClass` defines a type of capability and optional how this capability  is fulfilled.
+A `InterfaceClass` defines a type of capability and optional how this capability  is fulfilled.
 
 #### Out-of-band
 
-In a very simple case, the `CapabilityClass` is just defined with some out-of-band/custom controller, that will bind `CapabilityClaims` to this class.
+In a very simple case, the `InterfaceClass` is just defined with some out-of-band/custom controller, that will bind `InterfaceClaims` to this class.
 If you don't need automation yet, you can also specify a `provisioner` like `dave-checks-these-after-lunch` and let Dave handle the work.
 
 ```yaml
 apiVersion: vedette.io/v1alpha1
-kind: CapabilityClass
+kind: InterfaceClass
 metadata:
   name: awesome.postgres.sql
   namespace: default
@@ -171,7 +171,7 @@ provisioner: my-awesome-postgres-controller
 
 ```yaml
 apiVersion: vedette.io/v1alpha1
-kind: CapabilityClass
+kind: InterfaceClass
 metadata:
   name: prod.postgres.sql
   namespace: default
@@ -197,7 +197,7 @@ static:
 
 ```yaml
 apiVersion: vedette.io/v1alpha1
-kind: CapabilityClass
+kind: InterfaceClass
 metadata:
   name: staging.postgres.sql
   namespace: default
@@ -241,7 +241,7 @@ mapping:
 
 ## Recommended Labels
 
-Similar to Kubernetes, Vedette defines a few common labels for `CapabilityClass` objects, to make working with multiple classes a bit less annoying.
+Similar to Kubernetes, Vedette defines a few common labels for `InterfaceClass` objects, to make working with multiple classes a bit less annoying.
 
 |Key|Description|Example|Type|
 |---|-----------|-------|----|
