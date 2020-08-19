@@ -24,47 +24,197 @@ Just change your apps requirements to "I want something speaking mysql protocol,
 
 ## API
 
+### InterfaceProvisioner
+
+An `InterfaceProvisioner` will automatically create new `InterfaceInstances` when `InterfaceClaims` cannot be Bound to an existing instance.  
+Vedette provides multiple different provisioners.
+
+A `ClusterInterfaceProvisioner` can be used to Provision Instances across a whole Kubernetes Cluster.
+
+#### Out-of-band
+
+In a very simple case, the `InterfaceProvisioner` is just defined with some out-of-band/custom controller, that will bind `InterfaceClaims` to this class.
+If you don't need automation yet, you can also create a `dave-checks-these-after-lunch` `InterfaceProvisioner` and let Dave handle the work.
+
+```yaml
+apiVersion: vedette.io/v1alpha1
+kind: InterfaceProvisioner
+metadata:
+  name: awesome.postgres.sql
+  namespace: default
+priority: 1000    # priority of this InterfaceProvisioner relative to other provisioners
+capabilities:
+- db.sql.postgres # Database type
+- net.tls         # is TLS encrypted
+outOfBand: {}
+```
+
+#### Static
+
+A static provisioner will solve each claim, by issuing the same static data to all of them.
+In this example, we have a wildcard certificate that we want to share to anyone needing a wildcard cert for `company.com`.
+
+```yaml
+apiVersion: vedette.io/v1alpha1
+kind: InterfaceProvisioner
+metadata:
+  name: company-com-tls
+  namespace: default
+  labels:
+    vedette.io/env: prod
+priority: 50 # priority of this InterfaceProvisioner relative to other provisioners
+capabilities:
+- certificate
+- certificate.wildcard
+- company.com
+static:
+  credentials:
+  - name: company-com-tls
+    secretRef:
+      name: company-com-wildcard-tls
+```
+
+#### Mapping
+
+The mapping provisioner creates a new instance of a custom object to fulfill a claim. It can be used to offload work to other operators like KubeDB, without requiring the implementation of your own provisioner.
+
+```yaml
+apiVersion: vedette.io/v1alpha1
+kind: InterfaceProvisioner
+metadata:
+  name: staging.postgres.sql
+  namespace: default
+  labels:
+    vedette.io/env: staging
+priority: 50 # priority of this InterfaceProvisioner relative to other provisioners
+capabilities:
+- db.sql.postgres # Database type
+- net.tls         # is TLS encrypted
+mapping:
+  # object to create to fulfill the claim
+  template: |
+    apiVersion: kubedb.com/v1alpha1
+    kind: Postgres
+    metadata: {} # name and namespace are set by Vedette
+    spec:
+      version: "10.2-v1"
+      storageType: Durable
+      storage:
+        storageClassName: "standard"
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{.Capacity.Storage}}
+      terminationPolicy: DoNotTerminate
+  credentials:
+  - name: app-user
+    # KubeDB will auto-generate this secret for us.
+    # name is evaluated from the given go-template.
+    fromSecret:
+      name: '{{.Name}}-auth'
+  config:
+  - name: connection-data
+    # arbitrary key -> go-template mappings
+    fromTemplateMap:
+      # KubeDB will create a Service with the same name as the
+      # Postgres object itself.
+      host: '{{.Name}}'
+      port: '5432'
+      database: postgres # default db
+```
+
+### InterfaceInstance
+
+`InterfaceInstance` is _something_ that an InterfaceClaim can bind to. Think of it like a `PersistentVolume`, but it's an Interface that provides _something_. This can be a SQL Database, a REST API, or a complete application installation.
+
+```yaml
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceInstance
+metadata:
+  name: postgresql-01
+  namespace: my-app
+  labels:
+    vedette.io/protocol: postgresql
+    vedette.io/app: postgresql
+    vedette.io/env: staging
+  generation: 1
+spec:
+  # responsible provisioner instance (optional)
+  provisionerName: awesome.postgres.sql
+  # provided capabilities
+  capabilities:
+  - db.sql.postgres # Database type
+  - net.tls         # is TLS encrypted
+  # provided capacity
+  capacity:
+    storage: 50Gi
+  # Delete this instance when the Claim is removed.
+  # Alternative: Retain
+  reclaimPolicy: Delete
+  secrets:
+  - name: postgresql-01-admin-credentials
+  configMaps:
+  - name: postgresql-01-connection-data
+status:
+  observedGeneration: 1
+  phase: Bound
+  conditions:
+  - type: Ready
+    status: 'True'
+    reason: AllComponentsReady
+    message: All components report ready.
+  - type: Bound
+    status: 'True'
+    reason: Bound
+    message: Bound to my-app-db claim.
+```
+
 ### InterfaceClaim
 
-`InterfaceClaims` define, what your application needs from a dependency and how it wants to consume the connection informations.
+`InterfaceClaims` define, what your application needs from a dependency and how it wants to consume secrets and configuration to use an `InterfaceInstance`.
 
 ```yaml
 apiVersion: vedette.io/v1alpha1
 kind: InterfaceClaim
 metadata:
-  name: my-wordpress-db
+  name: my-app-db
+  namespace: my-app
+  generation: 1
 spec:
+  # capacity requirements, need to be met equally or more
+  capacity:
+    storage: 50Gi
+  # required capabilities of the interface implementation
+  capabilities:
+  - db.sql.postgres
+  - net.tls
+  # sub select specific instances
   selector:
     matchingLabels:
-      vedette.io/protocol: postgresql
-  config:
+      vedette.io/env: staging
+  configMaps:
   - name: connection-data
     # config keys will be available as environment variables with the given prefix.
     # e.g. POSTGRES_HOST, POSTGRES_PORT
-    env:
+    envFrom:
       prefix: POSTGRES_
-  credentials:
-  - name: app-user
+  secrets:
+  - name: admin-credentials
     # secrets will be mounted into the container file system on the given path.
-    file:
+    volumeMount:
       path: /var/secrets/database
-      
 status:
+  observedGeneration: 1
   phase: Bound
-  credentials:
-  - name: db-admin
-    secret:
-      name: my-wordpress-db
-  endpoints:
-  - name: postgres
-    service:
-      name: my-wordpress-db
   conditions:
   - type: Bound
     status: 'True'
+    reason: Bound
+    message: Bound to postgresql-01 instance.
 ```
 
-### Consuming Capabilities from a Pod
+#### Consuming Capabilities from a Pod
 
 To make use of capabilities from your application, all you have to do is add a reference to the `InterfaceClaim` into your `Deployment` annotations:
 
@@ -72,7 +222,7 @@ To make use of capabilities from your application, all you have to do is add a r
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment
+  name: my-app-db
   annotations:
     vedette.io/claim: my-wordpress-db
 spec:
@@ -100,7 +250,7 @@ For the `InterfaceClaim` above, it will look like this:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment
+  name: my-app-db
   annotations:
     vedette.io/claim: my-wordpress-db
 spec:
@@ -118,126 +268,30 @@ spec:
         image: nginx:1.14.2
         ports:
         - containerPort: 80
-        env:
 # --- inserted by Vedette (start)
-        - name: POSTGRES_HOST
-          value: "" # value from bound claim
-        - name: POSTGRES_PORT
-          value: "5432" # value from bound claim
+        envFrom:
+        - configMapRef:
+            name: postgresql-01-connection-data
+          prefix: POSTGRES_
         volumeMounts:
-        - name: my-wordpress-db-app-user
+        - name: my-app-db-app-user
           mountPath: /var/secrets/database
           readOnly: true
       volumes:
-      - name: my-wordpress-db-app-user
+      - name: my-app-db-app-user
         secret:
-          secretName: my-wordpress-db-app-user
+          secretName: postgresql-01-admin-credentials
 # --- inserted by Vedette (end)
 ```
 
-### InterfaceClaim matches multiple InterfaceClasses
+#### InterfaceClaim matches multiple InterfaceProvisioners
 
-`InterfaceClaims` need to select only a single `InterfaceClass`.
+If multiple `InterfaceProvisioners` can provision an `InterfaceInstance` that provides all capabilities for a Provider, the Provider with the highest Priority is chosen.
 
-If multiple `InterfaceClass` object match the specified selector and the `InterfaceClaim` is not yet `Bound` it will remain `Unbound` and a warning will be logged onto the `Claim`.  
+In case of multiple `InterfaceProvisioners` with the same Priority, `InterfaceProvisioners` take precedence over `ClusterInterfaceProvisioners`.
+
+If there are still multiple matches the `InterfaceClaim` it will remain `Unbound` and a warning will be logged onto the `Claim`.  
 The ambiguity needs to be resolved before the `InterfaceClaim` is bound to a backing instance.
-
-If the `InterfaceClaim` is already `Bound`, nothing will happen.
-
-### InterfaceClass
-
-A `InterfaceClass` defines a type of capability and optional how this capability  is fulfilled.
-
-#### Out-of-band
-
-In a very simple case, the `InterfaceClass` is just defined with some out-of-band/custom controller, that will bind `InterfaceClaims` to this class.
-If you don't need automation yet, you can also specify a `provisioner` like `dave-checks-these-after-lunch` and let Dave handle the work.
-
-```yaml
-apiVersion: vedette.io/v1alpha1
-kind: InterfaceClass
-metadata:
-  name: awesome.postgres.sql
-  namespace: default
-  labels:
-    vedette.io/protocol: postgresql
-    my-type: awesome
-provisioner: my-awesome-postgres-controller
-```
-
-#### Static
-
-`vedette.io/static` is a built-in provisioner that will solve each claim, by issuing the same static data to all of them.
-
-```yaml
-apiVersion: vedette.io/v1alpha1
-kind: InterfaceClass
-metadata:
-  name: prod.postgres.sql
-  namespace: default
-  labels:
-    vedette.io/protocol: postgresql
-    vedette.io/env: prod
-    important: Dave - Don't touch!
-provisioner: vedette.io/static
-static:
-  credentials:
-  - name: app-user
-    secret:
-      name: prod-app-user
-  config:
-  - name: connection-data
-    configMap:
-      name: prod-database
-```
-
-#### Mapping
-
-`vedette.io/mapping` is a built-in provisioner, that creates a new instance of a custom object to fulfill a claim. It can be used to offload work to other operators like KubeDB, without requiring the implementation of your own provisioner.
-
-```yaml
-apiVersion: vedette.io/v1alpha1
-kind: InterfaceClass
-metadata:
-  name: staging.postgres.sql
-  namespace: default
-  labels:
-    vedette.io/protocol: postgresql
-    vedette.io/env: staging
-provisioner: vedette.io/mapping
-mapping:
-  instance:
-    # object to create to fulfill the claim
-    apiVersion: kubedb.com/v1alpha1
-    kind: Postgres
-    metadata: {} # name and namespace are set by Vedette
-    spec:
-      version: "10.2-v1"
-      storageType: Durable
-      storage:
-        storageClassName: "standard"
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 50Mi
-      terminationPolicy: DoNotTerminate
-  credentials:
-  - name: app-user
-    # KubeDB will auto-generate this secret for us.
-    # name is evaluated from the given go-template.
-    fromSecret:
-      name: '{{.Name}}-auth'
-  config:
-  - name: connection-data
-    # arbitrary key -> go-template mappings
-    fromTemplateMap:
-      # KubeDB will create a Service with the same name as the
-      # Postgres object itself.
-      host: '{{.Name}}'
-      port: '5432'
-      database: postgres # default db
-```
 
 ## Recommended Labels
 
@@ -247,6 +301,7 @@ Similar to Kubernetes, Vedette defines a few common labels for `InterfaceClass` 
 |---|-----------|-------|----|
 |vedette.io/protocol|The main communication protocol used.|`postgres`|string|
 |vedette.io/env|Environment the class is intendet for.|`prod`, `staging`|string|
+|vedette.io/app|Application.|`prod`, `staging`|string|
 
 ## Open Issues
 
