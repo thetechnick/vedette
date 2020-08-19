@@ -1,3 +1,7 @@
 domain: vedette.io
 repo: github.com/thetechnick/vedette
+resources:
+- group: core
+  kind: InterfaceInstance
+  version: v1alpha1
 version: "2"
