@@ -1,0 +1,24 @@
+# permissions for end users to edit interfaceprovisioners.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: interfaceprovisioner-editor-role
+rules:
+- apiGroups:
+  - core.vedette.io
+  resources:
+  - interfaceprovisioners
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - core.vedette.io
+  resources:
+  - interfaceprovisioners/status
+  verbs:
+  - get

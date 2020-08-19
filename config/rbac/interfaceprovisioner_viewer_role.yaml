@@ -1,0 +1,20 @@
+# permissions for end users to view interfaceprovisioners.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: interfaceprovisioner-viewer-role
+rules:
+- apiGroups:
+  - core.vedette.io
+  resources:
+  - interfaceprovisioners
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - core.vedette.io
+  resources:
+  - interfaceprovisioners/status
+  verbs:
+  - get

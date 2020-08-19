@@ -1,0 +1,7 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceProvisioner
+metadata:
+  name: interfaceprovisioner-sample
+spec:
+  # Add fields here
+  foo: bar

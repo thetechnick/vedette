@@ -74,6 +74,14 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "InterfaceInstance")
 		os.Exit(1)
 	}
+	if err = (&controllers.InterfaceProvisionerReconciler{
+		Client: mgr.GetClient(),
+		Log:    ctrl.Log.WithName("controllers").WithName("InterfaceProvisioner"),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "InterfaceProvisioner")
+		os.Exit(1)
+	}
 	// +kubebuilder:scaffold:builder
 
 	setupLog.Info("starting manager")
