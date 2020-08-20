@@ -1,0 +1,52 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceProvisioner
+metadata:
+  name: nginx
+capabilities:
+- demo.webserver
+- demo.webserver.nginx
+mapping:
+  objects:
+  - template: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: {{.Name}}
+      spec:
+        selector:
+          matchLabels:
+            app: nginx
+            instance: {{.Name}}
+        replicas: 2
+        template:
+          metadata:
+            labels:
+              app: nginx
+              instance: {{.Name}}
+          spec:
+            containers:
+            - name: nginx
+              image: nginx:1.14.2
+              ports:
+              - containerPort: 80
+    readinessProbe:
+      jsonPath: '{.status.conditions[?(@.type=="Available")].status}'
+      regexTest: 'True'
+  - template: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: {{.Name}}
+      spec:
+        selector:
+          app: nginx
+          instance: {{.Name}}
+        ports:
+          - protocol: TCP
+            port: 80
+            targetPort: 80
+  outputs:
+  - name: connection
+    configMapTemplate:
+      host: '{{.Name}}.{{.Namespace}}.svc.cluster.local'
+      port: '80'

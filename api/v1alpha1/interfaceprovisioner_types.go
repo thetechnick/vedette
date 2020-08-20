@@ -20,38 +20,93 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
-// InterfaceProvisionerSpec defines the desired state of InterfaceProvisioner
-type InterfaceProvisionerSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of InterfaceProvisioner. Edit InterfaceProvisioner_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
-}
-
-// InterfaceProvisionerStatus defines the observed state of InterfaceProvisioner
-type InterfaceProvisionerStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
+// InterfaceProvisioner is the Schema for the interfaceprovisioners API.
 // +kubebuilder:object:root=true
-
-// InterfaceProvisioner is the Schema for the interfaceprovisioners API
+// +kubebuilder:printcolumn:name="Priority",type="number",JSONPath=".priority"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
+// +kubebuilder:resource:shortName=ip,categories=vedette
 type InterfaceProvisioner struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   InterfaceProvisionerSpec   `json:"spec,omitempty"`
-	Status InterfaceProvisionerStatus `json:"status,omitempty"`
+	// Priority of this provisioner relative to other provisioners.
+	// +kubebuilder:default=0
+	Priority int `json:"priority,omitempty"`
+	// Maximum capacity of a instances this provisioner can provide.
+	MaxCapacity ResourceList `json:"maxCapacity,omitempty"`
+	// Capabilities that this instance provisioner can provide.
+	Capabilities CapabilitiesList `json:"capabilities"`
+	// What happens with this Instance after it is released from a Claim.
+	// +kubebuilder:default=Delete
+	ReclaimPolicy InterfaceReclaimPolicy `json:"reclaimPolicy,omitempty"`
+
+	// Provisioner Configuration
+
+	// Custom provisioner outside of Vedette.
+	// Vedette will just create a new InterfaceInstance with the provisioner set to the name of this object.
+	// Further processing needs to be implemented in a custom controller.
+	OutOfBand *OutOfBandProvisioner `json:"outOfBand,omitempty"`
+
+	// The static provisioner will hand out the same secrets and configmaps to every Claim it encounters.
+	Static *StaticProvisioner `json:"static,omitempty"`
+
+	// The mapping provisioner creates a new instance of a custom object to fulfill a claim.
+	// It can be used to offload work to other operators like KubeDB, without requiring the implementation of your own provisioner.
+	Mapping *MappingProvisioner `json:"mapping,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// OutOfBandProvisioner defines the configuration of provider implementations outside of Vedette.
+type OutOfBandProvisioner struct{}
+
+// StaticProvisioner hands out the same configuration to all provisioned instances.
+type StaticProvisioner struct {
+	// Outputs is a list of Secrets or ConfigMaps that holds configuration and credentials to interact with this instance.
+	Outputs []OutputReference `json:"outputs,omitempty"`
+}
+
+type MappingProvisioner struct {
+	// List of objects to create, when provisioning an Instance.
+	Objects []MappedObject `json:"objects"`
+	// Outputs defines how to find outputs for the dynamic objects created.
+	Outputs []MappingProvisionerOutput `json:"outputs"`
+}
+
+type MappedObject struct {
+	// Template contains a go template that is executed to create the object.
+	Template string `json:"template"`
+	// ReadinessProbe tests the created object for readiness.
+	ReadinessProbe *MappedObjectReadinessProbe `json:"readinessProbe,omitempty"`
+}
+
+type MappedObjectReadinessProbe struct {
+	// JSONPath selecting a property to test for readyness.
+	JSONPath string `json:"jsonPath"`
+	// Regular Expression to test the property selected by the JSONPath.
+	RegexTest string `json:"regexTest"`
+}
+
+type MappingProvisionerOutput struct {
+	// Name of this output.
+	Name string `json:"name"`
+	// References a Secret in the same namespace.
+	SecretRef *MappingProvisionerObjectReference `json:"secretRef,omitempty"`
+	// References a ConfigMap in the same namespace.
+	ConfigMapRef *MappingProvisionerObjectReference `json:"configMapRef,omitempty"`
+	// Creates a new Secret via the given template.
+	SecretTemplate MappingProvisionerOutputTemplate `json:"secretTemplate,omitempty"`
+	// Creates a new ConfigMap via the given template.
+	ConfigMapTemplate MappingProvisionerOutputTemplate `json:"configMapTemplate,omitempty"`
+}
+
+type MappingProvisionerObjectReference struct {
+	NameTemplate string `json:"nameTemplate"`
+}
+
+// Map of keys to go templates to populate a Secret or ConfigMap with.
+type MappingProvisionerOutputTemplate map[string]string
 
 // InterfaceProvisionerList contains a list of InterfaceProvisioner
+// +kubebuilder:object:root=true
 type InterfaceProvisionerList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`

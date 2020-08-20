@@ -1,0 +1,14 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceClaim
+metadata:
+  name: pgsql-client-01
+spec:
+  capabilities:
+  - db.sql.pgsql
+  inputs:
+  - name: admin-user
+    secretRef:
+      name: pgsql-client-01-admin-user
+  - name: connection
+    configMapRef:
+      name: pgsql-client-01-connection

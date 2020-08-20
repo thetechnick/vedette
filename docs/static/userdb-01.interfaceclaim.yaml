@@ -1,0 +1,14 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceClaim
+metadata:
+  name: userdb-01
+spec:
+  capabilities:
+  - com.example.userdb
+  inputs:
+  - name: connection
+    configMapRef:
+      name: userdb-01-connection
+  - name: user
+    secretRef:
+      name: userdb-01-user

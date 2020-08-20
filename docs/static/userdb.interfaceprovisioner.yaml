@@ -1,0 +1,30 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceProvisioner
+metadata:
+  name: userdb
+capabilities:
+- com.example.userdb
+static:
+  outputs:
+  - name: connection
+    configMapRef:
+      name: userdb
+  - name: user
+    secretRef:
+      name: userdb-ro-user
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: userdb
+data:
+  host: staging.db.company.com
+  database: users
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: userdb-ro-user
+stringData:
+  username: userdb-ro
+  password: password

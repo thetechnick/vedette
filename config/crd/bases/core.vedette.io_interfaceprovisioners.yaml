@@ -1,0 +1,195 @@
+
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.2.9
+  creationTimestamp: null
+  name: interfaceprovisioners.core.vedette.io
+spec:
+  group: core.vedette.io
+  names:
+    categories:
+    - vedette
+    kind: InterfaceProvisioner
+    listKind: InterfaceProvisionerList
+    plural: interfaceprovisioners
+    shortNames:
+    - ip
+    singular: interfaceprovisioner
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .priority
+      name: Priority
+      type: number
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: InterfaceProvisioner is the Schema for the interfaceprovisioners
+          API.
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          capabilities:
+            description: Capabilities that this instance provisioner can provide.
+            items:
+              type: string
+            minItems: 1
+            type: array
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          mapping:
+            description: The mapping provisioner creates a new instance of a custom
+              object to fulfill a claim. It can be used to offload work to other operators
+              like KubeDB, without requiring the implementation of your own provisioner.
+            properties:
+              objects:
+                description: List of objects to create, when provisioning an Instance.
+                items:
+                  properties:
+                    readinessProbe:
+                      description: ReadinessProbe tests the created object for readiness.
+                      properties:
+                        jsonPath:
+                          description: JSONPath selecting a property to test for readyness.
+                          type: string
+                        regexTest:
+                          description: Regular Expression to test the property selected
+                            by the JSONPath.
+                          type: string
+                      required:
+                      - jsonPath
+                      - regexTest
+                      type: object
+                    template:
+                      description: Template contains a go template that is executed
+                        to create the object.
+                      type: string
+                  required:
+                  - template
+                  type: object
+                type: array
+              outputs:
+                description: Outputs defines how to find outputs for the dynamic objects
+                  created.
+                items:
+                  properties:
+                    configMapRef:
+                      description: References a ConfigMap in the same namespace.
+                      properties:
+                        nameTemplate:
+                          type: string
+                      required:
+                      - nameTemplate
+                      type: object
+                    configMapTemplate:
+                      additionalProperties:
+                        type: string
+                      description: Creates a new ConfigMap via the given template.
+                      type: object
+                    name:
+                      description: Name of this output.
+                      type: string
+                    secretRef:
+                      description: References a Secret in the same namespace.
+                      properties:
+                        nameTemplate:
+                          type: string
+                      required:
+                      - nameTemplate
+                      type: object
+                    secretTemplate:
+                      additionalProperties:
+                        type: string
+                      description: Creates a new Secret via the given template.
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+            required:
+            - objects
+            - outputs
+            type: object
+          maxCapacity:
+            additionalProperties:
+              anyOf:
+              - type: integer
+              - type: string
+              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+              x-kubernetes-int-or-string: true
+            description: Maximum capacity of a instances this provisioner can provide.
+            type: object
+          metadata:
+            type: object
+          outOfBand:
+            description: Custom provisioner outside of Vedette. Vedette will just
+              create a new InterfaceInstance with the provisioner set to the name
+              of this object. Further processing needs to be implemented in a custom
+              controller.
+            type: object
+          priority:
+            default: 0
+            description: Priority of this provisioner relative to other provisioners.
+            type: integer
+          reclaimPolicy:
+            default: Delete
+            description: What happens with this Instance after it is released from
+              a Claim.
+            type: string
+          static:
+            description: The static provisioner will hand out the same secrets and
+              configmaps to every Claim it encounters.
+            properties:
+              outputs:
+                description: Outputs is a list of Secrets or ConfigMaps that holds
+                  configuration and credentials to interact with this instance.
+                items:
+                  properties:
+                    configMapRef:
+                      description: ConfigMapRef references a ConfigMap in this namespace.
+                      properties:
+                        name:
+                          type: string
+                      required:
+                      - name
+                      type: object
+                    name:
+                      description: Name of this output reference.
+                      type: string
+                    secretRef:
+                      description: SecretRef references a Secret in this namespace.
+                      properties:
+                        name:
+                          type: string
+                      required:
+                      - name
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+            type: object
+        required:
+        - capabilities
+        type: object
+    served: true
+    storage: true
+    subresources: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []

@@ -1,0 +1,36 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceInstance
+metadata:
+  name: pgsql-01
+spec:
+  capacity:
+    # capacity this instance can provide
+    # this can include storage, CPU/Memory or bandwidth
+    # or any other quantifiable property
+    storage: 5Gi
+  capabilities:
+  - db.sql
+  - db.sql.pgsql
+  reclaimPolicy: Retain
+  outputs:
+  - name: admin-user
+    secretRef:
+      name: pgsql-01-admin-user
+  - name: connection
+    configMapRef:
+      name: pgsql-01-connection
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pgsql-01-admin-user
+stringData:
+  username: admin
+  password: password
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgsql-01-connection
+data:
+  host: pgsql-01

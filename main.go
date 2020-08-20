@@ -21,9 +21,10 @@ import (
 	"os"
 
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/dynamic"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
-	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
 	corev1alpha1 "github.com/thetechnick/vedette/api/v1alpha1"
@@ -38,7 +39,6 @@ var (
 
 func init() {
 	_ = clientgoscheme.AddToScheme(scheme)
-
 	_ = corev1alpha1.AddToScheme(scheme)
 	// +kubebuilder:scaffold:scheme
 }
@@ -66,26 +66,41 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Client without Event-Driven Cache.
+	// See comments in InterfaceClaimReconciler about a race condition,
+	// when cache-sync/events are slower than the reconcile loop.
+	uncachedClient, err := client.New(mgr.GetConfig(), client.Options{
+		Scheme: scheme,
+		Mapper: mgr.GetRESTMapper(),
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to setup uncached client")
+		os.Exit(1)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to setup dynamic client")
+		os.Exit(1)
+	}
+	dynamicWatcher := controllers.NewDynamicWatcher(
+		ctrl.Log.WithName("DynamicWatcher"),
+		mgr.GetScheme(), mgr.GetRESTMapper(), dynamicClient)
+
 	if err = (&controllers.InterfaceInstanceReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("InterfaceInstance"),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		Log:            ctrl.Log.WithName("controllers").WithName("InterfaceInstance"),
+		Scheme:         mgr.GetScheme(),
+		DynamicWatcher: dynamicWatcher,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "InterfaceInstance")
 		os.Exit(1)
 	}
-	if err = (&controllers.InterfaceProvisionerReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("InterfaceProvisioner"),
-		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
-		setupLog.Error(err, "unable to create controller", "controller", "InterfaceProvisioner")
-		os.Exit(1)
-	}
 	if err = (&controllers.InterfaceClaimReconciler{
-		Client: mgr.GetClient(),
-		Log:    ctrl.Log.WithName("controllers").WithName("InterfaceClaim"),
-		Scheme: mgr.GetScheme(),
+		Client:         mgr.GetClient(),
+		UncachedClient: uncachedClient,
+		Log:            ctrl.Log.WithName("controllers").WithName("InterfaceClaim"),
+		Scheme:         mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "InterfaceClaim")
 		os.Exit(1)

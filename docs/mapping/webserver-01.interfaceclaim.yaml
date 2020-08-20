@@ -1,0 +1,11 @@
+apiVersion: core.vedette.io/v1alpha1
+kind: InterfaceClaim
+metadata:
+  name: webserver-01
+spec:
+  capabilities:
+  - demo.webserver
+  inputs:
+  - name: connection
+    configMapRef:
+      name: webserver-01-connection

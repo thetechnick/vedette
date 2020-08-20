@@ -1,7 +1,0 @@
-apiVersion: core.vedette.io/v1alpha1
-kind: InterfaceClaim
-metadata:
-  name: interfaceclaim-sample
-spec:
-  # Add fields here
-  foo: bar
